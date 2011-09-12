@@ -1,0 +1,9 @@
+*.orig
+*.out
+*.5
+*.6
+*.8
+_*
+swapi
+.idea
+*.iml
