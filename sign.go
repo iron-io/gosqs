@@ -7,9 +7,10 @@ import (
 	"launchpad.net/goamz/aws"
 	"sort"
 	"strings"
+	"url"
 )
 
-func sign(auth aws.Auth, method, path string, params http.Values, headers http.Header) {
+func sign(auth aws.Auth, method, path string, params url.Values, headers http.Header) {
 	params.Set("AWSAccessKeyId", auth.AccessKey)
 	params.Set("SignatureMethod", "HmacSHA256")
 	params.Set("SignatureVersion", "2")
