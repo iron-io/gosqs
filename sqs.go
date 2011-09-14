@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"url"
 	"xml"
 )
 
@@ -83,7 +84,7 @@ type listQueuesResponse struct {
 //
 // See http://goo.gl/q1ue9 for more details.
 func (sqs *SQS) ListQueues(namePrefix string) ([]*Queue, os.Error) {
-	params := http.Values{}
+	params := url.Values{}
 	if namePrefix != "" {
 		params.Set("QueueNamePrefix", namePrefix)
 	}
@@ -93,7 +94,7 @@ func (sqs *SQS) ListQueues(namePrefix string) ([]*Queue, os.Error) {
 	}
 	queues := make([]*Queue, len(resp.Queues))
 	for i, queue := range resp.Queues {
-		u, err := http.ParseURL(queue)
+		u, err := url.Parse(queue)
 		if err != nil {
 			return nil, err
 		}
@@ -102,8 +103,8 @@ func (sqs *SQS) ListQueues(namePrefix string) ([]*Queue, os.Error) {
 	return queues, nil
 }
 
-func (sqs *SQS) newRequest(method, action, url string, params http.Values) (*http.Request, os.Error) {
-	req, err := http.NewRequest("GET", url, nil)
+func (sqs *SQS) newRequest(method, action, url_ string, params url.Values) (*http.Request, os.Error) {
+	req, err := http.NewRequest("GET", url_, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func (sqs *SQS) doRequest(req *http.Request, resp interface{}) os.Error {
 	return xml.Unmarshal(r.Body, resp)
 }
 
-func (sqs *SQS) post(action, path string, params http.Values, body []byte, resp interface{}) os.Error {
+func (sqs *SQS) post(action, path string, params url.Values, body []byte, resp interface{}) os.Error {
 	endpoint := strings.Replace(sqs.Region.EC2Endpoint, "ec2", "sqs", 1) + path
 	req, err := sqs.newRequest("POST", action, endpoint, params)
 	if err != nil {
@@ -174,9 +175,9 @@ func (sqs *SQS) post(action, path string, params http.Values, body []byte, resp 
 	return sqs.doRequest(req, resp)
 }
 
-func (sqs *SQS) get(action, path string, params http.Values, resp interface{}) os.Error {
+func (sqs *SQS) get(action, path string, params url.Values, resp interface{}) os.Error {
 	if params == nil {
-		params = http.Values{}
+		params = url.Values{}
 	}
 	endpoint := strings.Replace(sqs.Region.EC2Endpoint, "ec2", "sqs", 1) + path
 	req, err := sqs.newRequest("GET", action, endpoint, params)
@@ -223,7 +224,7 @@ type createQueuesResponse struct {
 //
 // See http://goo.gl/EwNUK for more details.
 func (sqs *SQS) CreateQueue(name string, opt *CreateQueueOpt) (*Queue, os.Error) {
-	params := http.Values{
+	params := url.Values{
 		"QueueName": []string{name},
 	}
 	if opt != nil {
@@ -234,7 +235,7 @@ func (sqs *SQS) CreateQueue(name string, opt *CreateQueueOpt) (*Queue, os.Error)
 	if err := sqs.get("CreateQueue", "/", params, &resp); err != nil {
 		return nil, err
 	}
-	u, err := http.ParseURL(resp.QueueUrl)
+	u, err := url.Parse(resp.QueueUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +246,7 @@ func (sqs *SQS) CreateQueue(name string, opt *CreateQueueOpt) (*Queue, os.Error)
 //
 // See http://goo.gl/zc45Q for more details.
 func (q *Queue) DeleteQueue() os.Error {
-	params := http.Values{}
+	params := url.Values{}
 	var resp ResponseMetadata
 	if err := q.SQS.get("DeleteQueue", q.path, params, &resp); err != nil {
 		return err
@@ -262,7 +263,7 @@ func (q *Queue) DeleteMessage() os.Error {
 
 type QueueAttributes struct {
 	Attributes []struct {
-		Name string
+		Name  string
 		Value string
 	}
 	ResponseMetadata
@@ -272,7 +273,7 @@ type QueueAttributes struct {
 //
 // See http://goo.gl/X01zD for more details.
 func (q *Queue) GetQueueAttributes(attrs ...Attribute) (*QueueAttributes, os.Error) {
-	params := http.Values{}
+	params := url.Values{}
 	for i, attr := range attrs {
 		key := fmt.Sprintf("Attribute.%d", i)
 		params[key] = []string{string(attr)}
@@ -317,7 +318,7 @@ type sendMessageResponse struct {
 //
 // See http://goo.gl/ThjJG for more details.
 func (q *Queue) SendMessage(body string) (string, os.Error) {
-	params := http.Values{
+	params := url.Values{
 		"MessageBody": []string{body},
 	}
 	var resp sendMessageResponse
