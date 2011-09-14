@@ -160,7 +160,8 @@ func (sqs *SQS) doRequest(req *http.Request, resp interface{}) os.Error {
 }
 
 func (sqs *SQS) post(action, path string, params http.Values, body []byte, resp interface{}) os.Error {
-	req, err := sqs.newRequest("POST", action, sqs.Region.SQSEndpoint+path, params)
+	endpoint := strings.Replace(sqs.Region.EC2Endpoint, "ec2", "sqs", 1) + path
+	req, err := sqs.newRequest("POST", action, endpoint, params)
 	if err != nil {
 		return err
 	}
@@ -177,7 +178,8 @@ func (sqs *SQS) get(action, path string, params http.Values, resp interface{}) o
 	if params == nil {
 		params = http.Values{}
 	}
-	req, err := sqs.newRequest("GET", action, sqs.Region.SQSEndpoint+path, params)
+	endpoint := strings.Replace(sqs.Region.EC2Endpoint, "ec2", "sqs", 1) + path
+	req, err := sqs.newRequest("GET", action, endpoint, params)
 	if err != nil {
 		return err
 	}
@@ -245,7 +247,6 @@ func (sqs *SQS) CreateQueue(name string, opt *CreateQueueOpt) (*Queue, os.Error)
 func (q *Queue) DeleteQueue() os.Error {
 	params := http.Values{}
 	var resp ResponseMetadata
-	println("path is", q.path)
 	if err := q.SQS.get("DeleteQueue", q.path, params, &resp); err != nil {
 		return err
 	}
@@ -312,7 +313,7 @@ type sendMessageResponse struct {
 }
 
 // SendMessage delivers a message to the specified queue.
-// It returns the sent message's ID as a string.
+// It returns the sent message's ID.
 //
 // See http://goo.gl/ThjJG for more details.
 func (q *Queue) SendMessage(body string) (string, os.Error) {

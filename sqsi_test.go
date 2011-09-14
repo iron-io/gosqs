@@ -30,7 +30,6 @@ func (s *SI) TestBasicFunctionality(c *C) {
 
 	queues, err := s.sqs.ListQueues("")
 	c.Assert(err, IsNil)
-	fmt.Println(queues)
 
 	_, err = q.SendMessage("hi")
 	c.Assert(err, IsNil)
