@@ -10,17 +10,16 @@
 package sqs
 
 import (
+	"encoding/xml"
 	"fmt"
-	"http"
 	"io/ioutil"
 	"launchpad.net/goamz/aws"
-	"os"
+	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
-	"url"
-	"xml"
 )
 
 // The SQS type encapsulates operations with a specific SQS region.
@@ -61,7 +60,7 @@ type ResponseMetadata struct {
 	RequestId string
 }
 
-func (sqs *SQS) Queue(name string) (*Queue, os.Error) {
+func (sqs *SQS) Queue(name string) (*Queue, error) {
 	qs, err := sqs.ListQueues(name)
 	if err != nil {
 		return nil, err
@@ -83,7 +82,7 @@ type listQueuesResponse struct {
 // ListQueues returns a list of your queues.
 //
 // See http://goo.gl/q1ue9 for more details.
-func (sqs *SQS) ListQueues(namePrefix string) ([]*Queue, os.Error) {
+func (sqs *SQS) ListQueues(namePrefix string) ([]*Queue, error) {
 	params := url.Values{}
 	if namePrefix != "" {
 		params.Set("QueueNamePrefix", namePrefix)
@@ -103,14 +102,14 @@ func (sqs *SQS) ListQueues(namePrefix string) ([]*Queue, os.Error) {
 	return queues, nil
 }
 
-func (sqs *SQS) newRequest(method, action, url_ string, params url.Values) (*http.Request, os.Error) {
+func (sqs *SQS) newRequest(method, action, url_ string, params url.Values) (*http.Request, error) {
 	req, err := http.NewRequest("GET", url_, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	params["Action"] = []string{action}
-	params["Timestamp"] = []string{time.UTC().Format(time.RFC3339)}
+	params["Timestamp"] = []string{time.Now().UTC().Format(time.RFC3339)}
 	params["Version"] = []string{"2009-02-01"}
 
 	req.Header.Set("Host", req.Host)
@@ -129,19 +128,20 @@ type Error struct {
 	RequestId  string // A unique ID for this request
 }
 
-func (err *Error) String() string {
+func (err *Error) Error() string {
 	return err.Message
 }
 
-func buildError(r *http.Response) os.Error {
+func buildError(r *http.Response) error {
 	err := Error{}
 	err.StatusCode = r.StatusCode
 	err.StatusMsg = r.Status
-	xml.Unmarshal(r.Body, &err)
+  body, _ := ioutil.ReadAll(r.Body)
+	xml.Unmarshal(body, &err)
 	return &err
 }
 
-func (sqs *SQS) doRequest(req *http.Request, resp interface{}) os.Error {
+func (sqs *SQS) doRequest(req *http.Request, resp interface{}) error {
 	/*dump, _ := http.DumpRequest(req, true)
 	println("req DUMP:\n", string(dump))*/
 
@@ -157,10 +157,11 @@ func (sqs *SQS) doRequest(req *http.Request, resp interface{}) os.Error {
 	if r.StatusCode != 200 {
 		return buildError(r)
 	}
-	return xml.Unmarshal(r.Body, resp)
+  body, _ := ioutil.ReadAll(r.Body)
+	return xml.Unmarshal(body, resp)
 }
 
-func (sqs *SQS) post(action, path string, params url.Values, body []byte, resp interface{}) os.Error {
+func (sqs *SQS) post(action, path string, params url.Values, body []byte, resp interface{}) error {
 	endpoint := strings.Replace(sqs.Region.EC2Endpoint, "ec2", "sqs", 1) + path
 	req, err := sqs.newRequest("POST", action, endpoint, params)
 	if err != nil {
@@ -175,7 +176,7 @@ func (sqs *SQS) post(action, path string, params url.Values, body []byte, resp i
 	return sqs.doRequest(req, resp)
 }
 
-func (sqs *SQS) get(action, path string, params url.Values, resp interface{}) os.Error {
+func (sqs *SQS) get(action, path string, params url.Values, resp interface{}) error {
 	if params == nil {
 		params = url.Values{}
 	}
@@ -199,7 +200,7 @@ func (q *Queue) Name() string {
 // AddPermission adds a permission to a queue for a specific principal.
 //
 // See http://goo.gl/vG4CP for more details.
-func (q *Queue) AddPermission() os.Error {
+func (q *Queue) AddPermission() error {
 	return nil
 }
 
@@ -207,7 +208,7 @@ func (q *Queue) AddPermission() os.Error {
 // in a queue to a new value.
 //
 // See http://goo.gl/tORrh for more details.
-func (q *Queue) ChangeMessageVisibility() os.Error {
+func (q *Queue) ChangeMessageVisibility() error {
 	return nil
 }
 
@@ -223,7 +224,7 @@ type createQueuesResponse struct {
 // CreateQueue creates a new queue.
 //
 // See http://goo.gl/EwNUK for more details.
-func (sqs *SQS) CreateQueue(name string, opt *CreateQueueOpt) (*Queue, os.Error) {
+func (sqs *SQS) CreateQueue(name string, opt *CreateQueueOpt) (*Queue, error) {
 	params := url.Values{
 		"QueueName": []string{name},
 	}
@@ -245,7 +246,7 @@ func (sqs *SQS) CreateQueue(name string, opt *CreateQueueOpt) (*Queue, os.Error)
 // DeleteQueue deletes a queue.
 //
 // See http://goo.gl/zc45Q for more details.
-func (q *Queue) DeleteQueue() os.Error {
+func (q *Queue) DeleteQueue() error {
 	params := url.Values{}
 	var resp ResponseMetadata
 	if err := q.SQS.get("DeleteQueue", q.path, params, &resp); err != nil {
@@ -257,7 +258,7 @@ func (q *Queue) DeleteQueue() os.Error {
 // DeleteMessage deletes a message from the queue.
 //
 // See http://goo.gl/t8jnk for more details.
-func (q *Queue) DeleteMessage() os.Error {
+func (q *Queue) DeleteMessage() error {
 	return nil
 }
 
@@ -272,7 +273,7 @@ type QueueAttributes struct {
 // GetQueueAttributes returns one or all attributes of a queue.
 //
 // See http://goo.gl/X01zD for more details.
-func (q *Queue) GetQueueAttributes(attrs ...Attribute) (*QueueAttributes, os.Error) {
+func (q *Queue) GetQueueAttributes(attrs ...Attribute) (*QueueAttributes, error) {
 	params := url.Values{}
 	for i, attr := range attrs {
 		key := fmt.Sprintf("Attribute.%d", i)
@@ -293,7 +294,7 @@ type Message struct {
 // ReceiveMessage retrieves one or more messages from the queue.
 //
 // See http://goo.gl/8RLI4 for more details.
-func (q *Queue) ReceiveMessage() (*Message, os.Error) {
+func (q *Queue) ReceiveMessage() (*Message, error) {
 	var resp Message
 	if err := q.get("ReceiveMessage", q.path, nil, &resp); err != nil {
 		return nil, err
@@ -304,7 +305,7 @@ func (q *Queue) ReceiveMessage() (*Message, os.Error) {
 // RemovePermission removes a permission from a queue for a specific principal.
 //
 // See http://goo.gl/5QB9W for more details.
-func (q *Queue) RemovePermission() os.Error {
+func (q *Queue) RemovePermission() error {
 	return nil
 }
 
@@ -317,7 +318,7 @@ type sendMessageResponse struct {
 // It returns the sent message's ID.
 //
 // See http://goo.gl/ThjJG for more details.
-func (q *Queue) SendMessage(body string) (string, os.Error) {
+func (q *Queue) SendMessage(body string) (string, error) {
 	params := url.Values{
 		"MessageBody": []string{body},
 	}
@@ -331,6 +332,6 @@ func (q *Queue) SendMessage(body string) (string, os.Error) {
 // SetQueueAttributes sets one attribute of a queue.
 //
 // See http://goo.gl/YtIjs for more details.
-func (q *Queue) SetQueueAttributes() os.Error {
+func (q *Queue) SetQueueAttributes() error {
 	return nil
 }
