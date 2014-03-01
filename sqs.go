@@ -296,6 +296,7 @@ func (q *Queue) GetQueueAttributes(attrs ...Attribute) (*QueueAttributes, error)
 type Message struct {
 	Id   string `xml:"ReceiveMessageResult>Message>MessageId"`
 	Body string `xml:"ReceiveMessageResult>Message>Body"`
+	ReceiptHandle string `xml:"ReceiveMessageResult>Message>ReceiptHandle"`
 }
 
 // ReceiveMessage retrieves one or more messages from the queue.
