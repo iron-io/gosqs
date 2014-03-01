@@ -258,7 +258,14 @@ func (q *Queue) DeleteQueue() error {
 // DeleteMessage deletes a message from the queue.
 //
 // See http://goo.gl/t8jnk for more details.
-func (q *Queue) DeleteMessage() error {
+func (q *Queue) DeleteMessage(message *Message) error {
+	params := url.Values{}
+	var resp ResponseMetadata
+
+	params.Set("ReceiptHandle", message.ReceiptHandle)
+	if err := q.get("DeleteMessage", q.path, params, &resp); err != nil {
+		return err
+	}
 	return nil
 }
 
