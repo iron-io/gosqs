@@ -258,7 +258,14 @@ func (q *Queue) DeleteQueue() error {
 // DeleteMessage deletes a message from the queue.
 //
 // See http://goo.gl/t8jnk for more details.
-func (q *Queue) DeleteMessage() error {
+func (q *Queue) DeleteMessage(message *Message) error {
+	params := url.Values{}
+	var resp ResponseMetadata
+
+	params.Set("ReceiptHandle", message.ReceiptHandle)
+	if err := q.get("DeleteMessage", q.path, params, &resp); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -289,6 +296,7 @@ func (q *Queue) GetQueueAttributes(attrs ...Attribute) (*QueueAttributes, error)
 type Message struct {
 	Id   string `xml:"ReceiveMessageResult>Message>MessageId"`
 	Body string `xml:"ReceiveMessageResult>Message>Body"`
+	ReceiptHandle string `xml:"ReceiveMessageResult>Message>ReceiptHandle"`
 }
 
 // ReceiveMessage retrieves one or more messages from the queue.
